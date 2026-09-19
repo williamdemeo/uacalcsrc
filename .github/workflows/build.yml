@@ -1,0 +1,104 @@
+# File: .github/workflows/build.yml
+#
+# Two things, both asked for in issue #15.
+#
+# 1. On every push and pull request, build uacalc.jar from this source with
+#    Ant and check that the GUI starts, so a change that breaks the build is
+#    reported at once rather than discovered at the next release.
+#
+# 2. When a release is published on the Releases page, build the jars from
+#    the tagged source and attach to that release any jar it does not already
+#    carry.  A jar somebody uploaded by hand is left alone; a release made
+#    with no files at all gets the whole set, built by GitHub from exactly the
+#    tagged commit.  So making a release is: publish it with a tag such as
+#    v1.20, and wait a minute.
+#
+# The build targets Java 8 bytecode, as the jars on uacalc.org always have, so
+# the result runs on any Java from 8 on.  The two -Dant.build.javac.* settings
+# are Ant's own way of saying so and need no change to build.xml.
+
+name: Build
+
+on:
+  push:
+  pull_request:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build uacalc.jar and start it
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Set up a JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install Ant, and a virtual framebuffer for the smoke test
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ant xvfb
+
+      - name: Build the jars (Java 8 bytecode)
+        run: |
+          ant -Ddist.dir="$PWD/dist" -Dclass.dir="$PWD/classes" \
+              -Dant.build.javac.source=1.8 -Dant.build.javac.target=1.8 \
+              dist-jar
+          ls -l dist/lib
+
+      # A GUI does not exit, so the test is that it is still running when the
+      # timeout fires, which `timeout` reports as status 124.  With no display
+      # the same command exits 0 after a HeadlessException, and with a jar
+      # that does not load it exits 1, so 124 means the window came up.  The
+      # `|| status=$?` is because Actions runs this under `bash -e`, which
+      # would otherwise stop at the 124 before it can be tested.
+      - name: Smoke test, the GUI comes up and stays up for 30 seconds
+        run: |
+          status=0
+          timeout 30 xvfb-run -a java -jar dist/lib/uacalc.jar || status=$?
+          echo "exit status $status (124 means the timeout fired on a live window)"
+          test "$status" -eq 124
+
+      - name: Keep the jars with this run
+        uses: actions/upload-artifact@v4
+        with:
+          name: uacalc-jars
+          path: dist/lib/*.jar
+          if-no-files-found: error
+
+  release:
+    name: Attach the jars to the release
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Fetch the jars the build job made
+        uses: actions/download-artifact@v4
+        with:
+          name: uacalc-jars
+          path: jars-built
+
+      - name: Upload each jar the release does not already have
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          already="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          for f in jars-built/*.jar; do
+            name="$(basename "$f")"
+            if printf '%s\n' "$already" | grep -qx "$name"; then
+              echo "$name: already on the release, leaving it as it is"
+            else
+              echo "$name: uploading"
+              gh release upload "$TAG" "$f"
+            fi
+          done

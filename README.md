@@ -278,6 +278,25 @@ for more details.
 
 -----------------------------------------
 
+## Releases, and how the jar is built
+
+Every jar on the [Releases page](https://github.com/UACalc/uacalcsrc/releases)
+is built by GitHub from the tagged source, by the workflow in
+`.github/workflows/build.yml`, which also builds and starts the program on
+every push so that a broken build is noticed at once.  To make a new release,
+publish one on that page with a tag such as `v1.20`; within a minute the
+workflow attaches `uacalc.jar` and its four companion jars.  A jar uploaded by
+hand is left as it is.
+
+The permanent address of the newest `uacalc.jar` is
+<https://github.com/UACalc/uacalcsrc/releases/latest/download/uacalc.jar>.
+
+To build it yourself, with Ant and any JDK from 8 on:
+
+    ant -Dant.build.javac.source=1.8 -Dant.build.javac.target=1.8 dist-jar
+
+which leaves the jars in `../dist/lib`.
+
 ## Bugs and Other Issues
 If you think you found a bug in the calculator, if you encounter a problem with
 the instructions on this page, or if you have any other issue that you'd like to
