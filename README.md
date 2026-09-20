@@ -280,22 +280,34 @@ for more details.
 
 ## Releases, and how the jar is built
 
-Every jar on the [Releases page](https://github.com/UACalc/uacalcsrc/releases)
-is built by GitHub from the tagged source, by the workflow in
-`.github/workflows/build.yml`, which also builds and starts the program on
-every push so that a broken build is noticed at once.  To make a new release,
-publish one on that page with a tag such as `v1.20`; within a minute the
-workflow attaches `uacalc.jar` and its four companion jars.  A jar uploaded by
-hand is left as it is.
+`uacalc.jar` is compiled from this source by GitHub, by the workflow in
+`.github/workflows/build.yml`, which builds it on every push and starts the
+program to check that its window appears.  The four companion jars are not
+compiled: `LatDraw.jar`, `groovy-all-1.0.jar`, `groovy-engine.jar` and
+`miglayout-3.7-swing.jar` are copied unchanged out of this repository's
+`jars/` directory, which is where the build gets them.
+
+To make a release, publish one on the
+[Releases page](https://github.com/UACalc/uacalcsrc/releases) with a tag such
+as `v1.20`.  Within a minute the workflow attaches, of those five jars, the
+ones the release does not already have, built from the tagged commit.  A jar
+you attached yourself is never replaced, so a release whose files you uploaded
+by hand keeps exactly those; that is what
+[v1.19](https://github.com/UACalc/uacalcsrc/releases/tag/v1.19) is, and its
+`LatDraw.jar` is the newer build from uacalc.org rather than the one in
+`jars/`.
 
 The permanent address of the newest `uacalc.jar` is
 <https://github.com/UACalc/uacalcsrc/releases/latest/download/uacalc.jar>.
 
-To build it yourself, with Ant and any JDK from 8 on:
+To build it yourself, with Ant and a Java 8 JDK:
 
-    ant -Dant.build.javac.source=1.8 -Dant.build.javac.target=1.8 dist-jar
+    ant dist-jar
 
-which leaves the jars in `../dist/lib`.
+which leaves the jars in `../dist/lib`.  A newer JDK will build it too, and
+adding `-Dant.build.javac.source=1.8 -Dant.build.javac.target=1.8` keeps the
+class files loadable by Java 8; but only a Java 8 JDK also stops the code
+calling methods that Java 8 does not have, which is why the workflow uses one.
 
 ## Bugs and Other Issues
 If you think you found a bug in the calculator, if you encounter a problem with
